@@ -18,3 +18,5 @@
 ```powershell
 adb install -r "D:\VibeCode\Xiaomi15_RealtimeTranslator\app\build\outputs\apk\release\app-release.apk"
 ```
+
+*Cập nhật mốc tự động: Step 286 | 2026-11-18 17:06:52*

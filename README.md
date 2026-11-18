@@ -76,10 +76,10 @@ Xiaomi15_RealtimeTranslator/
 ## 📱 Hướng dẫn cài đặt & sử dụng trên Xiaomi 15
 
 ### Cài đặt APK
-1. Tải file `app-release.apk` từ mục **Releases** (hoặc tự build theo hướng dẫn bên dưới).
+1. Tải file `X15-Realtime-Translate-v1.2.0.apk` từ mục **[Releases](https://github.com/lvh0210/X15-Realtime-Translate/releases)** (hoặc tự build theo hướng dẫn bên dưới).
 2. Cài đặt qua ADB hoặc cài trực tiếp trên điện thoại:
    ```powershell
-   adb install -r app-release.apk
+   adb install -r X15-Realtime-Translate-v1.2.0.apk
    ```
 3. Mở **X15 Dịch Realtime**:
    - Cấp quyền `su` khi trình quản lý Root (Magisk / KernelSU / APatch) hỏi.
@@ -110,7 +110,7 @@ Yêu cầu: **OpenJDK 11**, **Android SDK Platform 34 & Build-Tools 34.0.0**, **
   ```powershell
   .\build_apk.ps1 -Task assembleRelease
   ```
-  File đầu ra: `app/build/outputs/apk/release/app-release.apk`.
+  File đầu ra: `app/build/outputs/apk/release/X15-Realtime-Translate-v1.2.0.apk`.
 
 ---
 
