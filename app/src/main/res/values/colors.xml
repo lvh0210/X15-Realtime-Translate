@@ -1,0 +1,12 @@
+<resources>
+    <color name="bg_amoled">#FF0A0C10</color>
+    <color name="surface_card">#FF131720</color>
+    <color name="surface_elevated">#FF1B2130</color>
+    <color name="accent_cyan">#FF38BDF8</color>
+    <color name="accent_emerald">#FF34D399</color>
+    <color name="accent_amber">#FFFBBF24</color>
+    <color name="accent_rose">#FFFB7185</color>
+    <color name="text_primary">#FFF1F5F9</color>
+    <color name="text_secondary">#FF94A3B8</color>
+    <color name="stroke_subtle">#FF263042</color>
+</resources>

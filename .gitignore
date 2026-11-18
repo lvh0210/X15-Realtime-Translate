@@ -1,0 +1,19 @@
+# Gradle & build artifacts
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# IDE & OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+*.swp
+
+# Graphify cache / local generated
+graphify-out/

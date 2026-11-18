@@ -1,0 +1,22 @@
+# Lộ trình phát triển X15 Realtime Translate
+
+- [x] **Chặng 1: Khởi tạo dự án & Hạ tầng build Android Native**
+  - [x] 1.1: Kiểm tra môi trường SDK/JDK/Gradle/NDK cục bộ (Unity AndroidPlayer SDK 34 + OpenJDK 11 + Gradle 7.5.1)
+  - [x] 1.2: Khởi tạo thư mục dự án, `README.md`, `PLAN.md`, `CHECKPOINT.md`
+  - [x] 1.3: Cấu hình Gradle project (`build.gradle`, `settings.gradle`, `gradle.properties`, `AndroidManifest.xml`, tài nguyên UI tối giản)
+- [x] **Chặng 2: Lõi chụp màn hình siêu tốc & phát hiện thay đổi (Capture & Diff Engine)**
+  - [x] 2.1: Xây dựng `RootCaptureEngine` sử dụng persistent `su` shell đọc raw framebuffer `screencap` (<25ms) kèm auto-grant quyền Overlay & whitelist pin HyperOS
+  - [x] 2.2: Xây dựng `MediaProjectionCapture` dự phòng khi chưa kích hoạt temp root
+  - [x] 2.3: Xây dựng `FrameDiffDetector` (dHash / pixel-stride grid diff) chống spam OCR khi màn hình tĩnh
+- [x] **Chặng 3: Nhận diện văn bản đa ngôn ngữ & Engine dịch Hybrid (OCR + Translate)**
+  - [x] 3.1: Xây dựng `MultiScriptOcrEngine` (ML Kit v2: Latin, Chinese, Japanese, Korean) hỗ trợ lọc vùng & gộp dòng thông minh
+  - [x] 3.2: Xây dựng `TranslationCache` (LRU RAM + disk persistence)
+  - [x] 3.3: Xây dựng `HybridTranslator` (Google Fast Batch + ML Kit On-Device Offline + OpenRouter/DeepSeek/Gemini API)
+- [x] **Chặng 4: Hệ thống Overlay 2 chế độ & Giao diện điều khiển**
+  - [x] 4.1: Xây dựng `OverlayService` quản lý bong bóng nổi (Floating Pill), menu chuyển chế độ nhanh và đồng bộ ẩn/hiện khi chụp
+  - [x] 4.2: Xây dựng `TranslationOverlayView` (hiển thị đè vị trí chữ gốc + chế độ bảng phụ đề) và `RegionSelectorView` (kéo vùng dịch tức thì / ghim vùng Auto Realtime)
+  - [x] 4.3: Xây dựng `MainActivity` (trạng thái Root, cấu hình tốc độ/ngôn ngữ/AI API, tải gói dịch Offline, cấp quyền nhanh)
+- [x] **Chặng 5: Kiểm thử, Build APK & Tối ưu hóa hoàn chỉnh**
+  - [x] 5.1: Viết unit test cho FrameDiff, Batch marker parsing, TranslationCache và chạy kiểm thử
+  - [x] 5.2: Biên dịch `assembleDebug` / `assembleRelease` bằng Gradle cục bộ và rà soát lỗi/hiệu năng
+  - [x] 5.3: Cập nhật `graphify`, `CHECKPOINT.md` và hoàn tất báo cáo hướng dẫn cài đặt lên Xiaomi 15
