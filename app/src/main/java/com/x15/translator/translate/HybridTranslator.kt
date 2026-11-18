@@ -11,6 +11,7 @@ import com.google.mlkit.nl.translate.TranslatorOptions
 import com.x15.translator.SettingsStore
 import com.x15.translator.TranslateEngine
 import com.x15.translator.ocr.OcrBlock
+import com.x15.translator.ocr.OcrPostProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -27,7 +28,9 @@ data class TranslatedBlock(
     val original: String,
     val translated: String,
     val box: android.graphics.Rect,
-    val engineUsed: String
+    val engineUsed: String,
+    val bgColor: Int = android.graphics.Color.argb(235, 16, 20, 28),
+    val textColor: Int = android.graphics.Color.WHITE
 )
 
 /**
@@ -126,9 +129,19 @@ class HybridTranslator(
 
         for (i in blocks.indices) {
             val blk = blocks[i]
+            if (OcrPostProcessor.isLikelyVietnamese(blk.text)) {
+                continue
+            }
             val cached = cache.get(engineTag, blk.text)
             if (!cached.isNullOrBlank()) {
-                results[i] = TranslatedBlock(blk.text, cached, blk.box, "$engineTag (cache)")
+                results[i] = TranslatedBlock(
+                    blk.text,
+                    cached,
+                    blk.box,
+                    "$engineTag (cache)",
+                    blk.bgColor,
+                    blk.textColor
+                )
             } else {
                 missIndices.add(i)
                 missTexts.add(blk.text)
@@ -177,10 +190,17 @@ class HybridTranslator(
                 val origIdx = missIndices[m]
                 val blk = blocks[origIdx]
                 val outText = translatedMisses.getOrElse(m) { "" }.ifBlank { blk.text }
-                if (outText != blk.text) {
+                if (!outText.equals(blk.text, ignoreCase = true)) {
                     cache.put(engineTag, blk.text, outText)
+                    results[origIdx] = TranslatedBlock(
+                        blk.text,
+                        outText,
+                        blk.box,
+                        actualTag,
+                        blk.bgColor,
+                        blk.textColor
+                    )
                 }
-                results[origIdx] = TranslatedBlock(blk.text, outText, blk.box, actualTag)
             }
         }
 

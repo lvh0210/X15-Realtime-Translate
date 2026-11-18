@@ -12,4 +12,4 @@
 2. Cài đặt qua ADB: `adb install -r "D:\VibeCode\Xiaomi15_RealtimeTranslator\app\build\outputs\apk\release\app-release.apk"`.
 3. Mở app **X15 Dịch Realtime** → cấp quyền Root (`su`) khi được hỏi → nhấn **Cấp quyền Root** để tự mở quyền Overlay & bỏ giới hạn pin HyperOS → nhấn **Bật Bong Bóng Dịch**.
 
-*Cập nhật mốc tự động: Step 150 | 2026-11-18 14:50:31*
+*Cập nhật mốc tự động: Step 181 | 2026-11-18 15:11:43*

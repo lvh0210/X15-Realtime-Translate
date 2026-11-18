@@ -86,6 +86,8 @@ class OverlayService : Service() {
     private var autoRunning = false
     private var lastTextSignature = ""
     private var lastPinnedRegion: Rect? = null
+    private val recentRenderedTexts = HashSet<String>()
+    private var idleProbeCounter = 0
 
     private var screenW = 1200
     private var screenH = 2670
@@ -161,6 +163,7 @@ class OverlayService : Service() {
                     settings.overlayAlpha
                 )
                 lastTextSignature = ""
+                recentRenderedTexts.clear()
                 diffDetector.reset()
             }
         }
@@ -270,18 +273,18 @@ class OverlayService : Service() {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(dp(11), dp(8), dp(11), dp(8))
+            setPadding(dp(9), dp(6), dp(9), dp(6))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#E6111827"))
-                cornerRadius = dp(24).toFloat()
-                setStroke(dp(1.5f).toInt(), Color.parseColor("#38BDF8"))
+                setColor(Color.parseColor("#CC0F172A"))
+                cornerRadius = dp(20).toFloat()
+                setStroke(dp(1f).toInt(), Color.parseColor("#8838BDF8"))
             }
-            alpha = 0.85f
+            alpha = 0.55f
         }
         val label = TextView(this).apply {
-            text = "⚡ Dịch"
+            text = "⚡"
             setTextColor(Color.parseColor("#F8FAFC"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
         }
         container.addView(label)
 
@@ -293,7 +296,7 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = screenW - dp(96)
+            x = screenW - dp(54)
             y = (screenH * 0.36f).toInt()
         }
 
@@ -313,7 +316,7 @@ class OverlayService : Service() {
         container.setOnTouchListener { v, ev ->
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    v.alpha = 1f
+                    v.alpha = 0.95f
                     downRawX = ev.rawX
                     downRawY = ev.rawY
                     startX = params.x
@@ -342,11 +345,10 @@ class OverlayService : Service() {
                     if (!moved && !longPressed) {
                         toggleQuickMenu()
                     } else if (moved) {
-                        // Snap to nearest horizontal edge for clean reading/gaming
-                        params.x = if (params.x + v.width / 2 < screenW / 2) dp(6) else screenW - v.width - dp(6)
+                        params.x = if (params.x + v.width / 2 < screenW / 2) dp(4) else screenW - v.width - dp(4)
                         runCatching { windowManager.updateViewLayout(v, params) }
                     }
-                    mainHandler.postDelayed({ v.alpha = if (autoRunning) 0.92f else 0.72f }, 1500L)
+                    mainHandler.postDelayed({ v.alpha = if (autoRunning) 0.65f else 0.48f }, 1500L)
                     true
                 }
                 else -> false
@@ -365,11 +367,11 @@ class OverlayService : Service() {
         if (autoRunning) {
             bubbleLabel?.text = "● AUTO"
             bubbleLabel?.setTextColor(Color.parseColor("#34D399"))
-            bg?.setStroke(dp(1.5f).toInt(), Color.parseColor("#34D399"))
+            bg?.setStroke(dp(1f).toInt(), Color.parseColor("#AA34D399"))
         } else {
-            bubbleLabel?.text = "⚡ Dịch"
+            bubbleLabel?.text = "⚡"
             bubbleLabel?.setTextColor(Color.parseColor("#F8FAFC"))
-            bg?.setStroke(dp(1.5f).toInt(), Color.parseColor("#38BDF8"))
+            bg?.setStroke(dp(1f).toInt(), Color.parseColor("#8838BDF8"))
         }
     }
 
@@ -386,6 +388,8 @@ class OverlayService : Service() {
 
         diffDetector.reset()
         lastTextSignature = ""
+        recentRenderedTexts.clear()
+        idleProbeCounter = 0
         autoLoopJob = serviceScope.launch {
             while (isActive && autoRunning) {
                 runAutoCycle()
@@ -394,34 +398,67 @@ class OverlayService : Service() {
         }
     }
 
+    /**
+     * Zero-flicker two-phase auto loop:
+     * 1) Probe screen WITHOUT hiding overlay (excluding overlay & system bars). If unchanged -> return immediately (0 blinks).
+     * 2) Only when content actually changes, wait brief scroll-settle, hide overlay cleanly for SurfaceFlinger commit, OCR, and re-render.
+     */
     private suspend fun runAutoCycle() {
         updateScreenMetrics()
         val pinned = lastPinnedRegion
-        val needHideOverlay =
-            settings.overlayStyle == OverlayStyle.IN_PLACE && overlayView.hasRenderedBlocks()
+        val excludes = buildExcludeRects(includeOverlayBoxes = true)
 
-        val frame = captureScreenClean(hideOverlay = needHideOverlay) ?: return
-        try {
-            val excludes = buildExcludeRects()
-            val changed = withContext(Dispatchers.Default) {
+        // Phase 1: Non-intrusive probe (never hides overlay!)
+        val probeFrame = captureScreenClean(hideOverlay = false) ?: return
+        val nonOverlayChanged = try {
+            withContext(Dispatchers.Default) {
                 diffDetector.hasSignificantChange(
-                    bitmap = frame,
+                    bitmap = probeFrame,
                     cropRegion = pinned,
                     excludeRects = excludes,
-                    threshold = 0.014f
+                    threshold = 0.016f
                 )
             }
-            if (!changed) return
+        } finally {
+            if (!probeFrame.isRecycled) probeFrame.recycle()
+        }
 
-            val ocrBlocks = ocrEngine.recognize(
-                fullBitmap = frame,
+        val periodicPinnedVerify = pinned != null &&
+            settings.overlayStyle == OverlayStyle.IN_PLACE &&
+            overlayView.hasRenderedBlocks() &&
+            (++idleProbeCounter >= 5)
+
+        if (!nonOverlayChanged && !periodicPinnedVerify) {
+            return
+        }
+        idleProbeCounter = 0
+
+        if (nonOverlayChanged) {
+            // Let active scroll settle slightly so we don't OCR blurred mid-scroll frames
+            delay(110L)
+        }
+
+        // Phase 2: Clean OCR capture (only hides IN_PLACE overlay when needed)
+        val needHideOverlay =
+            settings.overlayStyle == OverlayStyle.IN_PLACE && overlayView.hasRenderedBlocks()
+        val ocrFrame = captureScreenClean(hideOverlay = needHideOverlay) ?: return
+
+        try {
+            val ocrExcludes = buildExcludeRects(includeOverlayBoxes = false)
+            val rawBlocks = ocrEngine.recognize(
+                fullBitmap = ocrFrame,
                 script = settings.ocrScript,
                 cropRegion = pinned,
-                excludeRects = excludes
+                excludeRects = ocrExcludes
             )
+            val ocrBlocks = rawBlocks.filter { blk ->
+                !recentRenderedTexts.contains(TranslationCache.normalize(blk.text))
+            }
+
             if (ocrBlocks.isEmpty()) {
                 if (lastTextSignature.isNotEmpty()) {
                     lastTextSignature = ""
+                    recentRenderedTexts.clear()
                     overlayView.updateData(
                         emptyList(),
                         settings.overlayStyle,
@@ -440,6 +477,11 @@ class OverlayService : Service() {
             if (!autoRunning) return
 
             lastTextSignature = signature
+            recentRenderedTexts.clear()
+            for (tb in translated) {
+                recentRenderedTexts.add(TranslationCache.normalize(tb.translated))
+            }
+
             overlayView.setContentVisible(true)
             overlayView.updateData(
                 translated,
@@ -448,8 +490,22 @@ class OverlayService : Service() {
                 settings.fontSizeSp,
                 settings.overlayAlpha
             )
+
+            // Re-sync diff baseline after rendering new overlay so our own pills don't trigger next tick
+            delay(50L)
+            captureScreenClean(hideOverlay = false)?.let { postFrame ->
+                try {
+                    val postExcludes = buildExcludeRects(includeOverlayBoxes = true)
+                    withContext(Dispatchers.Default) {
+                        diffDetector.reset()
+                        diffDetector.hasSignificantChange(postFrame, pinned, postExcludes)
+                    }
+                } finally {
+                    if (!postFrame.isRecycled) postFrame.recycle()
+                }
+            }
         } finally {
-            if (!frame.isRecycled) frame.recycle()
+            if (!ocrFrame.isRecycled) ocrFrame.recycle()
         }
     }
 
@@ -459,19 +515,25 @@ class OverlayService : Service() {
         oneShotJob?.cancel()
         oneShotJob = serviceScope.launch {
             updateScreenMetrics()
-            val frame = captureScreenClean(hideOverlay = true) ?: return@launch
+            val frame = captureScreenClean(hideOverlay = overlayView.hasRenderedBlocks()) ?: return@launch
             try {
                 val blocks = ocrEngine.recognize(
                     fullBitmap = frame,
                     script = settings.ocrScript,
                     cropRegion = lastPinnedRegion,
-                    excludeRects = buildExcludeRects()
+                    excludeRects = buildExcludeRects(includeOverlayBoxes = false)
                 )
                 if (blocks.isEmpty()) {
-                    Toast.makeText(this@OverlayService, "Không phát hiện chữ trên màn hình", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@OverlayService,
+                        "Không phát hiện văn bản ngoại ngữ",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     return@launch
                 }
                 val translated = translator.translateBlocks(blocks)
+                recentRenderedTexts.clear()
+                translated.forEach { recentRenderedTexts.add(TranslationCache.normalize(it.translated)) }
                 overlayView.setContentVisible(true)
                 overlayView.updateData(
                     translated,
@@ -492,7 +554,7 @@ class OverlayService : Service() {
         popupController.dismiss()
 
         serviceScope.launch {
-            val preShot = if (!pinOnly) captureScreenClean(hideOverlay = true) else null
+            val preShot = if (!pinOnly) captureScreenClean(hideOverlay = overlayView.hasRenderedBlocks()) else null
             showRegionSelector(
                 promptLabel = if (pinOnly) "Kéo chọn vùng để Ghim Auto Realtime" else "Kéo chọn vùng cần dịch tức thì",
                 onSelected = { rect ->
@@ -516,12 +578,14 @@ class OverlayService : Service() {
         lastPinnedRegion = rect
         diffDetector.reset()
         lastTextSignature = ""
+        recentRenderedTexts.clear()
         overlayView.updateData(
             emptyList(),
             settings.overlayStyle,
             rect,
             settings.fontSizeSp,
-            settings.overlayAlpha
+            settings.overlayAlpha,
+            flashPinGuide = rect != null
         )
         if (rect != null) {
             Toast.makeText(this, "Đã ghim vùng Auto Realtime", Toast.LENGTH_SHORT).show()
@@ -545,15 +609,18 @@ class OverlayService : Service() {
                     cropRegion = rect
                 )
                 if (blocks.isEmpty()) {
-                    Toast.makeText(this@OverlayService, "Không thấy chữ trong vùng đã chọn", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@OverlayService, "Không thấy văn bản cần dịch trong vùng", Toast.LENGTH_SHORT).show()
                     return@launch
                 }
                 val translated = translator.translateBlocks(blocks, overrideEngine = overrideEngine)
+                if (translated.isEmpty()) {
+                    Toast.makeText(this@OverlayService, "Văn bản đã ở Tiếng Việt", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
                 val orig = translated.joinToString("\n") { it.original }
                 val trans = translated.joinToString("\n") { it.translated }
                 val eng = translated.firstOrNull()?.engineUsed ?: ""
 
-                // Copy bitmap if user clicks "Dịch AI" later
                 val snapshotCopy = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 popupController.show(
                     originalText = orig,
@@ -712,7 +779,7 @@ class OverlayService : Service() {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = dp(16)
-            y = ((bp?.y ?: (screenH / 3)) + dp(44)).coerceIn(dp(60), screenH - dp(240))
+            y = ((bp?.y ?: (screenH / 3)) + dp(40)).coerceIn(dp(60), screenH - dp(240))
         }
         menuView = card
         windowManager.addView(card, params)
@@ -755,6 +822,8 @@ class OverlayService : Service() {
     private suspend fun captureScreenClean(hideOverlay: Boolean): Bitmap? {
         if (hideOverlay) {
             setOverlayVisibilitySync(View.INVISIBLE)
+            // Wait ~42ms after vsync so RenderThread + SurfaceFlinger commit the hidden layer before screencap
+            delay(42L)
         }
         return try {
             withContext(Dispatchers.IO) {
@@ -785,15 +854,23 @@ class OverlayService : Service() {
         }
     }
 
-    private fun buildExcludeRects(): List<Rect> {
-        val list = ArrayList<Rect>(4)
+    private fun buildExcludeRects(includeOverlayBoxes: Boolean): List<Rect> {
+        val list = ArrayList<Rect>(12)
+        // Exclude status bar & gesture navigation bar so clock/battery/icons never trigger false rescans
+        list.add(Rect(0, 0, screenW, (screenH * 0.045f).toInt()))
+        list.add(Rect(0, (screenH * 0.96f).toInt(), screenW, screenH))
+
         bubbleView?.let { bv ->
             val bp = bubbleParams
             if (bp != null && bv.width > 0 && bv.height > 0) {
-                list.add(Rect(bp.x, bp.y, bp.x + bv.width, bp.y + bv.height))
+                list.add(Rect(bp.x - 8, bp.y - 8, bp.x + bv.width + 8, bp.y + bv.height + 8))
             }
         }
-        if (settings.overlayStyle == OverlayStyle.SUBTITLE_BAR) {
+        if (includeOverlayBoxes) {
+            for (r in overlayView.getOccupiedRects()) {
+                list.add(Rect(r.left - 6, r.top - 6, r.right + 6, r.bottom + 6))
+            }
+        } else if (settings.overlayStyle == OverlayStyle.SUBTITLE_BAR) {
             list.addAll(overlayView.getOccupiedRects())
         }
         return list

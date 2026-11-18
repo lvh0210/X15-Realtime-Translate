@@ -88,12 +88,26 @@ class TranslatorCoreTest {
     fun ocrPostProcessor_filtersNoiseAndScoresScripts() {
         assertFalse(OcrPostProcessor.isMeaningfulText("..."))
         assertFalse(OcrPostProcessor.isMeaningfulText("  | "))
+        assertFalse(OcrPostProcessor.isMeaningfulText("14:20"))
+        assertFalse(OcrPostProcessor.isMeaningfulText("99%"))
         assertTrue(OcrPostProcessor.isMeaningfulText("HP"))
         assertTrue(OcrPostProcessor.isMeaningfulText("剣"))
 
         val jaScore = OcrPostProcessor.scoreScriptMatch("こんにちは", "ja")
         val zhScore = OcrPostProcessor.scoreScriptMatch("こんにちは", "zh")
         assertTrue(jaScore > zhScore)
+    }
+
+    @Test
+    fun ocrPostProcessor_detectsVietnameseTargetLanguage() {
+        assertTrue(OcrPostProcessor.isLikelyVietnamese("Bắt đầu trò chơi"))
+        assertTrue(OcrPostProcessor.isLikelyVietnamese("Cài đặt hệ thống"))
+        assertTrue(OcrPostProcessor.isLikelyVietnamese("Đang dịch màn hình"))
+        assertFalse(OcrPostProcessor.isLikelyVietnamese("Start Game"))
+        assertFalse(OcrPostProcessor.isLikelyVietnamese("Settings & Audio"))
+        assertFalse(OcrPostProcessor.isLikelyVietnamese("こんにちは世界"))
+        assertFalse(OcrPostProcessor.isLikelyVietnamese("攻击力提升"))
+        assertFalse(OcrPostProcessor.isLikelyVietnamese("안녕하세요"))
     }
 
     @Test
