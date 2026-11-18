@@ -20,3 +20,8 @@
   - [x] 5.1: Viết unit test cho FrameDiff, Batch marker parsing, TranslationCache và chạy kiểm thử
   - [x] 5.2: Biên dịch `assembleDebug` / `assembleRelease` bằng Gradle cục bộ và rà soát lỗi/hiệu năng
   - [x] 5.3: Cập nhật `graphify`, `CHECKPOINT.md` và hoàn tất báo cáo hướng dẫn cài đặt lên Xiaomi 15
+- [x] **Chặng 6: Nâng cấp Hiển thị Hòa quyện Tự nhiên & Độ mượt Siêu cấp (Seamless Inpainting & Ultra-Smooth Typography)**
+  - [x] 6.1: Thiết kế thuật toán xóa nền viền lông mềm (Feathered Edge Erase / Soft Mask Inpainting) và lấy mẫu gradient/màu nền cục bộ để triệt tiêu cảm giác "miếng dán đè lên"
+  - [x] 6.2: Tách nhận diện theo từng dòng (Line-level placement) + căn chỉnh baseline và kiểu chữ tự nhiên (Sub-pixel Text Halo / Shadow)
+  - [x] 6.3: Thêm hoạt ảnh chuyển cảnh siêu mượt (Smooth Alpha Fade-in Transition 140ms) loại bỏ hoàn toàn giật cục
+  - [x] 6.4: Chạy kiểm thử, build APK Release v1.2.0, cập nhật GitHub Release và kiểm chứng trên Xiaomi 15

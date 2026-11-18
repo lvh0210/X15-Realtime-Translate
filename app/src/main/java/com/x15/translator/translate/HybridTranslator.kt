@@ -30,7 +30,8 @@ data class TranslatedBlock(
     val box: android.graphics.Rect,
     val engineUsed: String,
     val bgColor: Int = android.graphics.Color.argb(235, 16, 20, 28),
-    val textColor: Int = android.graphics.Color.WHITE
+    val textColor: Int = android.graphics.Color.WHITE,
+    val lineBoxes: List<android.graphics.Rect> = listOf(box)
 )
 
 /**
@@ -140,7 +141,8 @@ class HybridTranslator(
                     blk.box,
                     "$engineTag (cache)",
                     blk.bgColor,
-                    blk.textColor
+                    blk.textColor,
+                    blk.lineBoxes
                 )
             } else {
                 missIndices.add(i)
@@ -198,7 +200,8 @@ class HybridTranslator(
                         blk.box,
                         actualTag,
                         blk.bgColor,
-                        blk.textColor
+                        blk.textColor,
+                        blk.lineBoxes
                     )
                 }
             }

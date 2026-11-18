@@ -24,7 +24,8 @@ data class OcrBlock(
     val box: Rect,
     val scriptHint: String,
     val bgColor: Int = Color.argb(235, 16, 20, 28),
-    val textColor: Int = Color.WHITE
+    val textColor: Int = Color.WHITE,
+    val lineBoxes: List<Rect> = listOf(box)
 )
 
 /**
@@ -321,6 +322,23 @@ class MultiScriptOcrEngine {
             val rect = block.boundingBox ?: continue
             val cleanText = block.text.replace('\n', ' ').replace(Regex("\\s+"), " ").trim()
             if (!OcrPostProcessor.isMeaningfulText(cleanText)) continue
+            val lines = block.lines.mapNotNull { it.boundingBox }.map { r ->
+                Rect(
+                    r.left + offsetX,
+                    r.top + offsetY,
+                    r.right + offsetX,
+                    r.bottom + offsetY
+                )
+            }.ifEmpty {
+                listOf(
+                    Rect(
+                        rect.left + offsetX,
+                        rect.top + offsetY,
+                        rect.right + offsetX,
+                        rect.bottom + offsetY
+                    )
+                )
+            }
             out.add(
                 OcrBlock(
                     text = cleanText,
@@ -330,7 +348,8 @@ class MultiScriptOcrEngine {
                         rect.right + offsetX,
                         rect.bottom + offsetY
                     ),
-                    scriptHint = hint
+                    scriptHint = hint,
+                    lineBoxes = lines
                 )
             )
         }
